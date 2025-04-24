@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat en temps réel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #messages {
+            background: #fff;
+            border-radius: 10px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+        }
+
+        .message {
+            padding: 5px;
+            margin-bottom: 3px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+
+        #messageInput {
+            border-radius: 0;
+        }
+
+        #sendButton {
+            border-radius: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container pt-4">
+  <div class="row">
+    <!-- Chat principal -->
+    <div class="col-md-8">
+      <h2 class="text-center mb-4">💬 Chat en temps réel</h2>
+
+      <div id="usernameSection" class="mb-3">
+        <label for="usernameInput" class="form-label">Choisis un pseudo :</label>
+        <input type="text" id="usernameInput" class="form-control" placeholder="ex: DevJunior42">
+        <button id="setUsernameButton" class="btn btn-success mt-2 w-100">Entrer dans le chat</button>
+      </div>
+
+      <div id="chatBox" style="display: none;">
+        <div id="messages" class="mb-3"></div>
+        <div class="input-group">
+          <input id="messageInput" type="text" class="form-control" placeholder="Écris un message...">
+          <button id="sendButton" class="btn btn-primary">Envoyer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste des utilisateurs -->
+    <div class="col-md-4">
+      <h5>👥 Utilisateurs connectés</h5>
+      <ul id="userList" class="list-group"></ul>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script>
+    const socket = io();
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const usernameInput = document.getElementById('usernameInput');
+    const usernameButton = document.getElementById('setUsernameButton');
+    const chatBox = document.getElementById('chatBox');
+    const usernameSection = document.getElementById('usernameSection');
+
+    let username = "";
+
+    usernameButton.addEventListener('click', () => {
+        const input = usernameInput.value.trim();
+        if (input) {
+            username = input;
+            socket.emit('set_username', username);
+            usernameSection.style.display = 'none';
+            chatBox.style.display = 'block';
+            messageInput.focus();
+        } else {
+            alert("Entrez un pseudo valide.");
+        }
+    });
+
+    function appendMessage(msg) {
+        const messageElement = document.createElement('div');
+        messageElement.textContent = msg;
+        messageElement.className = "message";
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    socket.on('message_object', data => {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = "message d-flex justify-content-between align-items-center";
+    messageDiv.id = `msg-${data.id}`;
+
+    const text = document.createElement('span');
+    text.textContent = `${data.username}: ${data.content}`;
+
+    messageDiv.appendChild(text);
+
+    // Si l'utilisateur est l’auteur, on ajoute une icône "Supprimer"
+    if (data.username === username) {
+        const delBtn = document.createElement('button');
+        delBtn.className = "btn btn-sm btn-outline-danger";
+        delBtn.textContent = "🗑️";
+        delBtn.onclick = () => {
+            socket.emit('delete_message', data.id);
+        };
+        messageDiv.appendChild(delBtn);
+    }
+
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    socket.on('message_deleted', (id) => {
+    const msgEl = document.getElementById(`msg-${id}`);
+    if (msgEl) {
+        msgEl.remove();
+    }
+    });
+
+    sendButton.addEventListener('click', () => {
+        const msg = messageInput.value.trim();
+        if (msg !== "") {
+            socket.send(msg);
+            messageInput.value = "";
+        }
+    });
+
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === "Enter") {
+            sendButton.click();
+        }
+    });
+
+    // 🔄 Mettre à jour la liste des utilisateurs connectés
+    socket.on('user_list', (users) => {
+    const userList = document.getElementById('userList');
+    userList.innerHTML = '';
+    users.forEach(user => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.textContent = user;
+        userList.appendChild(li);
+    });
+    });
+
+    socket.on('message_system', msg => {
+    const systemMsg = document.createElement('div');
+    systemMsg.textContent = msg;
+    systemMsg.className = "message text-muted fst-italic";
+
+    // Si le message contient "❌", on le colore en rouge
+    if (msg.includes("❌")) {
+        systemMsg.classList.add("text-danger");
+    }
+
+    messagesDiv.appendChild(systemMsg);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+</script>
+</body>
+</html>
