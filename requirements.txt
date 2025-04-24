@@ -3,3 +3,4 @@ flask-socketio
 flask_sqlalchemy
 python-socketio
 eventlet
+gunicorn
